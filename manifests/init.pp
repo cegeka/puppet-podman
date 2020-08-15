@@ -57,6 +57,9 @@
 #   Should the module create the `/etc/containers/nodocker` file to quiet Docker CLI messages.
 #   Values should be either 'file' or 'absent'. (default is 'absent')
 #
+# @param varlink
+#   Should the module enable the optional podman varlink socket.
+#
 # @example Basic usage
 #   include podman
 #
@@ -101,14 +104,15 @@ class podman (
   Hash $volumes                    = {},
   Hash $images                     = {},
   Hash $containers                 = {},
+  Boolean $varlink                 = false,
 ){
   include podman::install
   include podman::options
+  if $varlink { include podman::varlink }
 
   # Create resources from parameter hashes
   $pods.each |$name, $properties| { Resource['Podman::Pod'] { $name: * => $properties, } }
   $volumes.each |$name, $properties| { Resource['Podman::Volume'] { $name: * => $properties, } }
   $images.each |$name, $properties| { Resource['Podman::Image'] { $name: * => $properties, } }
   $containers.each |$name, $properties| { Resource['Podman::Container'] { $name: * => $properties, } }
-
 }
