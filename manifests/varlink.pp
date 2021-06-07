@@ -1,74 +1,75 @@
-# @summary Create the varlink socket for podman
+# @summary Manage the varlink socket for podman
 #
 # @param ensure
 #   State of the resource must be either 'present' or 'absent'.
 #
 # @param socket
-#   Complete path to the varlink socket file
+#    Path to the podman socket file
 #
 # @param user
-#   The owner of the varlink socket
-#   
-# @param group
-#   The group owner of the varlink socket
-#   
-# @param socket_mode
-#   The file permission mode of the varlink socket
-#   
+#    The owner of the socket and file
 #
-class podman::varlink (
+# @param group
+#    The group owner of the socket directory and file
+#
+# @param socket_mode
+#    permissions applied to the socket
+#
+define podman::varlink (
   Enum['present', 'absent'] $ensure = 'present',
   String $socket                    = '/run/podman/io.podman',
   String $user                      = 'root',
   String $group                     = 'root',
   String $socket_mode               = '0750',
 ) {
-  # manage service temp files with systemd
-  $working_directory = join(split($socket, '/')[0:-1], ',')
+  require podman::install
+
+  # Manage varlink service temp files with systemd
+  $working_directory = join(split($socket, '/')[0,-2], '/')
   file { '/etc/tmpfiles.d/podman.conf':
-    ensure   => $ensure,
-    contents => "d ${working_directory} ${socket_mode} ${user} ${group}"
-    owner    => 'root',
-    group    => 'root'
-    notify   => Exec['podman-systemd-tmpfiles-refresh'],
+    ensure  => $ensure,
+    content => "d ${working_directory} ${socket_mode} ${user} ${group}",
+    owner   => 'root',
+    group   => 'root',
+    notify  => Exec['podman-systemd-tmpfiles-refresh'],
   }
 
   exec { 'podman-systemd-refresh':
-    command     => 'systemctl daemon-reload',
+    command     => '/usr/bin/systemctl daemon-reload',
     refreshonly => true,
   }
+
   exec { 'podman-systemd-tmpfiles-refresh':
-      command     => 'systemd-tmpfiles --create --no-pager',
-      refreshonly => true,
+    command     => '/usr/bin/systemd-tmpfiles --create --no-pager',
+    refreshonly => true,
   }
 
-  # install service file
-  file { '/etc/systemd/system/io.podman.socket' :
-    ensure   => $ensure,
-    content  => @("END"),
-                # FILE MANAGED BY PUPPET
-                [Unit]
-                Description=Podman Remote API Socket
-                Documentation=man:podman-varlink(1)
-                
-                [Socket]
-                ListenStream=${socket}
-                SocketMode=${socket_mode}
-                SocketUser=${user}
-                SocketGroup=${group}
-                
-                [Install]
-                WantedBy=sockets.target
-                |END
-    notify   => Exec['podman-systemd-refresh'],
+  file { '/etc/systemd/system/io.podman.socket':
+    ensure  => $ensure,
+    content => @("END"),
+               # FILE MANAGED BY PUPPET
+               [Unit]
+               Description=Podman Remote API Socket
+               Documentation=man:podman-varlink(1)
+               
+               [Socket]
+               ListenStream=${socket}
+               SocketUser=${user}
+               SocketGroup=${group}
+               SocketMode=${socket_mode}
+               
+               [Install]
+               WantedBy=sockets.target
+               |END
+    notify  => Exec['podman-systemd-refresh'],
   }
 
   if $ensure == 'present' {
     $svc_ensure = 'running'
-  	$svc_enable = 'true'
+    $svc_enable = true
   } else {
-  	$svc_ensure = 'stopped'
-  	$svc_enable = 'false'
+    $svc_ensure = 'stopped'
+    $svc_enable = false
   }
 
   service { 'io.podman.socket':

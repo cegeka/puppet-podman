@@ -58,7 +58,7 @@
 #   Values should be either 'file' or 'absent'. (default is 'absent')
 #
 # @param varlink
-#   Should the module enable the optional podman varlink socket.
+#   Should the module enable the optional varlink socket for podman.
 #
 # @example Basic usage
 #   include podman
@@ -108,7 +108,7 @@ class podman (
 ){
   include podman::install
   include podman::options
-  if $varlink { include podman::varlink }
+  if $varlink { Resource['Podman::Varlink'] { 'varlink': * => $varlink} }
 
   # Create resources from parameter hashes
   $pods.each |$name, $properties| { Resource['Podman::Pod'] { $name: * => $properties, } }

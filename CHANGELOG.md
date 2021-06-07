@@ -1,5 +1,9 @@
 # Changelog
 
+## Release 0.4.0
+
+- Add support for managing the varlink socket.  Contributed by volfco
+
 ## Release 0.3.0
 
 - Add the ability to manage host system configuration of container storage in '/etc/containers/storage.conf'.
