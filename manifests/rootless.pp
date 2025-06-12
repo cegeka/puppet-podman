@@ -1,38 +1,39 @@
 # @summary Enable a given user to run rootless podman containers as a systemd user service.
 #
 define podman::rootless {
-  exec { "loginctl_linger_${name}":
-    path     => '/sbin:/usr/sbin:/bin:/usr/bin',
-    command  => "loginctl enable-linger ${name}",
-    provider => 'shell',
-    unless   => "test $(loginctl show-user ${name} --property=Linger) = 'Linger=yes'",
-    require  => User[$name],
-    notify   => Service['podman systemd-logind'],
-  }
-  ensure_resource('Service', 'podman systemd-logind', { name => 'systemd-logind.service', ensure => 'running' })
+  ensure_resource('Loginctl_user', $name, { linger => enabled })
 
   # Ensure the systemd directory tree exists for user services
   ensure_resource('File', [
-      "${User[$name]['home']}/.config",
-      "${User[$name]['home']}/.config/systemd",
-      "${User[$name]['home']}/.config/systemd/user"
+      "${Users::Localuser[$name]['home']}/.config",
+      "${Users::Localuser[$name]['home']}/.config/systemd",
+      "${Users::Localuser[$name]['home']}/.config/systemd/user"
     ], {
       ensure  => directory,
       owner   => $name,
-      group   => "${User[$name]['gid']}",
+      group   => "${Users::Localuser[$name]['logingroup']}",
       mode    => '0700',
-      require => File["${User[$name]['home']}"],
+      require => Users::Localuser["$name"],
     }
+  )
+
+  # Create the user directory for rootless quadlet files
+  ensure_resource(
+    'File', [
+      '/etc/containers/systemd',
+      '/etc/containers/systemd/users',
+      "/etc/containers/systemd/users/${Users::Localuser[$name]['uid']}"
+    ],
+    { ensure  => directory }
   )
 
   exec { "start_${name}.slice":
     path    => $facts['path'],
     command => "machinectl shell ${name}@.host '/bin/true'",
-    unless  => "systemctl is-active user-${User[$name]['uid']}.slice",
+    unless  => "systemctl is-active user-${Users::Localuser[$name]['uid']}.slice",
     require => [
-      Exec["loginctl_linger_${name}"],
-      Service['podman systemd-logind'],
-      File["${User[$name]['home']}/.config/systemd/user"],
+      Loginctl_user[$name],
+      File["${Users::Localuser[$name]['home']}/.config/systemd/user"],
     ],
   }
 
@@ -41,12 +42,15 @@ define podman::rootless {
       command     => 'systemctl --user enable --now podman.socket',
       path        => $facts['path'],
       user        => $name,
-      unless      => 'systemctl --user status podman.socket',
-      require     => [Exec["loginctl_linger_${name}"], Exec["start_${name}.slice"]],
       environment => [
-        "HOME=${User[$name]['home']}",
-        "XDG_RUNTIME_DIR=/run/user/${User[$name]['uid']}",
-        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${User[$name]['uid']}/bus",
+        "HOME=${Users::Localuser[$name]['home']}",
+        "XDG_RUNTIME_DIR=/run/user/${Users::Localuser[$name]['uid']}",
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${Users::Localuser[$name]['uid']}/bus",
+      ],
+      unless      => 'systemctl --user status podman.socket',
+      require     => [
+        Loginctl_user[$name],
+        Exec["start_${name}.slice"],
       ],
     }
   }
