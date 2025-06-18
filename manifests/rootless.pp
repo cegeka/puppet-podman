@@ -6,6 +6,7 @@ define podman::rootless {
   # Ensure the systemd directory tree exists for user services
   ensure_resource('File', [
       "${Users::Localuser[$name]['home']}/.config",
+      "${Users::Localuser[$name]['home']}/.config/containers",
       "${Users::Localuser[$name]['home']}/.config/systemd",
       "${Users::Localuser[$name]['home']}/.config/systemd/user"
     ], {
