@@ -12,9 +12,9 @@ define podman::rootless {
     ], {
       ensure  => directory,
       owner   => $name,
-      group   => "${Users::Localuser[$name]['logingroup']}",
+      group   => Users::Localuser[$name]['logingroup'],
       mode    => '0700',
-      require => Users::Localuser["$name"],
+      require => Users::Localuser[$name],
     }
   )
 
