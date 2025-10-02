@@ -54,11 +54,6 @@ define podman::rootless {
         Loginctl_user[$name],
         Exec["start_${name}.slice"],
       ],
-      unless      => 'systemctl --user status podman.socket',
-      require     => [
-        Loginctl_user[$name],
-        Exec["start_${name}.slice"],
-      ],
     }
   }
 }
