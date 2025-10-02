@@ -5,5 +5,7 @@ fixtures:
   forge_modules:
     stdlib: "puppetlabs/stdlib"
     concat: "puppetlabs/concat"
+    inifile: "puppetlabs/inifile"
     selinux_core: "puppetlabs/selinux_core"
-    iniifile: "puppetlabs/inifile"
+    systemd: "puppet/systemd"
+    hashfile: "southalc/hashfile"

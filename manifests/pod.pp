@@ -29,7 +29,7 @@ define podman::pod (
 
   # The resource name will be the pod name by default
   $pod_name = $title
-  $name_flags = merge({ name => $title }, $flags )
+  $name_flags = stdlib::merge({ name => $title }, $flags )
 
   # Convert $flags hash to command arguments
   $_flags = $name_flags.reduce('') |$mem, $flag| {
@@ -52,7 +52,7 @@ define podman::pod (
     $exec_defaults = {
       cwd         => User[$user]['home'],
       user        => $user,
-      require     => [Podman::Rootless[$user], Service['podman systemd-logind']],
+      require     => [Podman::Rootless[$user]],
       environment => [
         "HOME=${User[$user]['home']}",
         "XDG_RUNTIME_DIR=/run/user/${User[$user]['uid']}",

@@ -18,6 +18,9 @@
 # @param machinectl_pkg
 #   The name of the machinectl package (default 'systemd-container').
 #
+# @param podman_pkg_ensure
+#   The ensure value for the podman package (default 'installed')
+#
 # @param buildah_pkg_ensure
 #   The ensure value for the buildah package (default 'absent')
 #
@@ -36,6 +39,9 @@
 #
 # @param storage_options
 #   A hash containing any storage options you wish to set in /etc/containers/storage.conf
+#
+# @param containers_options
+#   A hash containing any containers options you wish to set in /etc/containers/containers.conf
 #
 # @param rootless_users
 #   An array of users to manage using [`podman::rootless`](#podmanrootless)
@@ -78,6 +84,9 @@
 # @param networks
 #   A hash of networks to manage using [`podman::network`](#podmannetwork)
 #
+# @param quadlets
+#   A hash of quadlets to manage using [`podman::quadlet`](#podmanquadlet)
+#
 # @example Basic usage
 #   include podman
 #
@@ -106,40 +115,48 @@
 #         - Podman::Volume[jenkins]
 #
 class podman (
-  String                      $podman_pkg               = 'podman',
-  String                      $skopeo_pkg               = 'skopeo',
-  String                      $buildah_pkg              = 'buildah',
-  String                      $podman_docker_pkg        = 'podman-docker',
-  String                      $compose_pkg              = 'podman-compose',
-  String                      $machinectl_pkg           = 'systemd-container',
-  Enum['absent', 'installed'] $buildah_pkg_ensure       = 'absent',
-  Enum['absent', 'installed'] $podman_docker_pkg_ensure = 'installed',
-  Enum['absent', 'installed'] $compose_pkg_ensure       = 'absent',
-  Enum['absent', 'installed'] $machinectl_pkg_ensure    = 'installed',
-  Enum['absent', 'file']      $nodocker                 = 'absent',
-  Hash                        $storage_options          = {},
-  Array                       $rootless_users           = [],
-  Boolean                     $enable_api_socket        = false,
-  Boolean                     $manage_subuid            = false,
-  Boolean                     $match_subuid_subgid      = true,
-  String                      $file_header              = '# FILE MANAGED BY PUPPET',
-  Hash                        $subid                    = {},
-  Hash                        $pods                     = {},
-  Hash                        $volumes                  = {},
-  Hash                        $images                   = {},
-  Hash                        $containers               = {},
-  Hash                        $networks                 = {},
+  String                                            $podman_pkg               = 'podman',
+  String                                            $skopeo_pkg               = 'skopeo',
+  String                                            $buildah_pkg              = 'buildah',
+  String                                            $podman_docker_pkg        = 'podman-docker',
+  String                                            $compose_pkg              = 'podman-compose',
+  String                                            $machinectl_pkg           = 'systemd-container',
+  Pattern[/^(\d+\.){2}\d+$/, /absent/, /installed/] $podman_pkg_ensure        = 'installed',
+  Optional[Enum['absent', 'installed']]             $buildah_pkg_ensure       = undef,
+  Optional[Enum['absent', 'installed']]             $podman_docker_pkg_ensure = undef,
+  Optional[Pattern[/^(\d+\.){2}\d+$/, /absent/, /installed/]] $compose_pkg_ensure = undef,
+  Optional[Enum['absent', 'installed']]             $machinectl_pkg_ensure    = undef,
+  Enum['absent', 'file']                            $nodocker                 = 'absent',
+  Hash                                              $storage_options          = {},
+  Hash                                              $containers_options       = {},
+  Array                                             $rootless_users           = [],
+  Boolean                                           $enable_api_socket        = false,
+  Boolean                                           $manage_subuid            = false,
+  Boolean                                           $match_subuid_subgid      = true,
+  String                                            $file_header              = '# FILE MANAGED BY PUPPET',
+  Hash                                              $subid                    = {},
+  Hash                                              $pods                     = {},
+  Hash                                              $volumes                  = {},
+  Hash                                              $images                   = {},
+  Hash                                              $containers               = {},
+  Hash                                              $networks                 = {},
+  Hash                                              $quadlets                 = {},
 ) {
   include podman::install
   include podman::options
   include podman::service
 
   # Create resources from parameter hashes
-  $pods.each |$name, $properties| { Resource['Podman::Pod'] { $name: * => $properties, } }
+  $networks.each |$name, $properties| { Resource['Podman::Network'] { $name: * => $properties, } }
   $volumes.each |$name, $properties| { Resource['Podman::Volume'] { $name: * => $properties, } }
   $images.each |$name, $properties| { Resource['Podman::Image'] { $name: * => $properties, } }
+  $pods.each |$name, $properties| { Resource['Podman::Pod'] { $name: * => $properties, } }
   $containers.each |$name, $properties| { Resource['Podman::Container'] { $name: * => $properties, } }
-  $networks.each |$name, $properties| { Resource['Podman::Network'] { $name: * => $properties, } }
+  $quadlets.each |$name, $properties| {
+    Resource['Podman::Quadlet'] { $name:
+      * => stdlib::merge({ defaults => lookup(podman::quadlet::defaults) }, $properties),
+    }
+  }
 
   $rootless_users.each |$user| {
     unless defined(Podman::Rootless[$user]) {

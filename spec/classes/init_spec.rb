@@ -9,7 +9,7 @@ describe 'podman' do
       it { is_expected.to contain_class('podman::install') }
       it { is_expected.to contain_class('podman::options') }
       it { is_expected.to contain_class('podman::service') }
-      it { is_expected.to have_package_resource_count(6) }
+      it { is_expected.to have_package_resource_count(2) }
       it { is_expected.to have_podman__pod_resource_count(0) }
       it { is_expected.to have_podman__volume_resource_count(0) }
       it { is_expected.to have_podman__image_resource_count(0) }
@@ -19,15 +19,13 @@ describe 'podman' do
 
       # only here to reach 100% resource coverage
       it { is_expected.to contain_file('/etc/containers/nodocker') }        # from podman::install
-      it { is_expected.to contain_package('buildah') }                      # from podman::install
-      it { is_expected.to contain_package('podman-compose') }               # from podman::install
-      it { is_expected.to contain_package('podman-docker') }                # from podman::install
+      it { is_expected.not_to contain_package('podman-docker') }            # from podman::install
       it { is_expected.to contain_package('podman') }                       # from podman::install
       it { is_expected.to contain_package('skopeo') }                       # from podman::install
       if os_facts[:os]['family'] == 'Archlinux'
-        it { is_expected.to contain_package('systemd') }                    # from podman::install
+        it { is_expected.not_to contain_package('systemd') }                # from podman::install
       else
-        it { is_expected.to contain_package('systemd-container') }          # from podman::install
+        it { is_expected.not_to contain_package('systemd-container') }      # from podman::install
       end
       if os_facts[:os]['selinux']['enabled'] == true
         it { is_expected.to contain_selboolean('container_manage_cgroup') } # from podman::install
@@ -62,27 +60,39 @@ describe 'podman' do
     end
 
     context 'with buildah_pkg set to valid testing' do
-      let(:params) { { buildah_pkg: 'testing' } } # parameter used in podman::install
+      let(:params) { { buildah_pkg: 'testing', buildah_pkg_ensure: 'installed' } } # parameters used in podman::install
 
       it { is_expected.to contain_package('testing') }
     end
 
     context 'with podman_docker_pkg set to valid testing' do
-      let(:params) { { podman_docker_pkg: 'testing' } } # parameter used in podman::install
+      let(:params) { { podman_docker_pkg: 'testing', podman_docker_pkg_ensure: 'installed' } } # parameters used in podman::install
 
       it { is_expected.to contain_package('testing') }
     end
 
     context 'with compose_pkg set to valid testing' do
-      let(:params) { { compose_pkg: 'testing' } } # parameter used in podman::install
+      let(:params) { { compose_pkg: 'testing', compose_pkg_ensure: 'installed' } } # parameters used in podman::install
 
       it { is_expected.to contain_package('testing') }
     end
 
     context 'with machinectl_pkg set to valid testing' do
-      let(:params) { { machinectl_pkg: 'testing' } } # parameter used in podman::install
+      let(:params) { { machinectl_pkg: 'testing', machinectl_pkg_ensure: 'installed' } } # parameters used in podman::install
 
       it { is_expected.to contain_package('testing') }
+    end
+
+    context 'with podman_pkg_ensure set to valid installed' do
+      let(:params) { { podman_pkg_ensure: 'installed' } } # parameter used in podman::install
+
+      it { is_expected.to contain_package('podman').with_ensure('installed') }
+    end
+
+    context 'with podman_pkg_ensure set to valid version 1.0.0' do
+      let(:params) { { podman_pkg_ensure: '1.0.0' } } # parameter used in podman::install
+
+      it { is_expected.to contain_package('podman').with_ensure('1.0.0') }
     end
 
     context 'with buildah_pkg_ensure set to valid installed' do
@@ -100,6 +110,11 @@ describe 'podman' do
       let(:params) { { compose_pkg_ensure: 'installed' } } # parameter used in podman::install
 
       it { is_expected.to contain_package('podman-compose').with_ensure('installed') }
+    end
+    context 'with compose_pkg_ensure set to valid version 1.0.0' do
+      let(:params) { { compose_pkg_ensure: '1.0.0' } } # parameter used in podman::install
+
+      it { is_expected.to contain_package('podman-compose').with_ensure('1.0.0') }
     end
     context 'with machinectl_pkg_ensure set to valid absent' do
       let(:params) { { machinectl_pkg_ensure: 'absent' } } # parameter used in podman::install
@@ -153,6 +168,46 @@ describe 'podman' do
       end
     end
 
+    context 'with containers_options set to valid hash' do
+      let(:params) { { containers_options: { testing1: { option1: 'value1', option2: 'value2' }, testing2: { option3: 'value3' } } } }
+
+      it do
+        is_expected.to contain_ini_setting('/etc/containers/containers.conf [testing1] option1').only_with(
+          {
+            'section'  => 'testing1',
+            'setting'  => 'option1',
+            'value'    => 'value1',
+            'ensure'   => 'present',
+            'path'     => '/etc/containers/containers.conf',
+          },
+        )
+      end
+
+      it do
+        is_expected.to contain_ini_setting('/etc/containers/containers.conf [testing1] option2').only_with(
+          {
+            'section'  => 'testing1',
+            'setting'  => 'option2',
+            'value'    => 'value2',
+            'ensure'   => 'present',
+            'path'     => '/etc/containers/containers.conf',
+          },
+        )
+      end
+
+      it do
+        is_expected.to contain_ini_setting('/etc/containers/containers.conf [testing2] option3').only_with(
+          {
+            'section'  => 'testing2',
+            'setting'  => 'option3',
+            'value'    => 'value3',
+            'ensure'   => 'present',
+            'path'     => '/etc/containers/containers.conf',
+          },
+        )
+      end
+    end
+
     context 'with rootless_users set to valid [test, ing]' do
       let(:params) { { rootless_users: ['test', 'ing'] } }
       let(:pre_condition) do
@@ -178,17 +233,17 @@ describe 'podman' do
       it { is_expected.to contain_podman__rootless('ing').only_with({}) }
 
       # only here to reach 100% resource coverage
-      it { is_expected.to contain_exec('loginctl_linger_test') }            # from podman::rootless
-      it { is_expected.to contain_exec('loginctl_linger_ing') }             # from podman::rootless
-      it { is_expected.to contain_exec('start_test.slice') }                # from podman::rootless
-      it { is_expected.to contain_exec('start_ing.slice') }                 # from podman::rootless
-      it { is_expected.to contain_file('/home/ing/.config/systemd/user') }  # from podman::rootless
-      it { is_expected.to contain_file('/home/ing/.config/systemd') }       # from podman::rootless
-      it { is_expected.to contain_file('/home/ing/.config') }               # from podman::rootless
-      it { is_expected.to contain_file('/home/test/.config/systemd/user') } # from podman::rootless
-      it { is_expected.to contain_file('/home/test/.config/systemd') }      # from podman::rootless
-      it { is_expected.to contain_file('/home/test/.config') }              # from podman::rootless
-      it { is_expected.to contain_service('podman systemd-logind') }        # from podman::rootless
+      it { is_expected.to contain_loginctl_user('test') }                       # from podman::rootless
+      it { is_expected.to contain_loginctl_user('ing') }                        # from podman::rootless
+      it { is_expected.to contain_exec('start_test.slice') }                    # from podman::rootless
+      it { is_expected.to contain_exec('start_ing.slice') }                     # from podman::rootless
+      it { is_expected.to contain_file('/home/ing/.config/systemd/user') }      # from podman::rootless
+      it { is_expected.to contain_file('/home/ing/.config/systemd') }           # from podman::rootless
+      it { is_expected.to contain_file('/home/ing/.config') }                   # from podman::rootless
+      it { is_expected.to contain_file('/home/test/.config/systemd/user') }     # from podman::rootless
+      it { is_expected.to contain_file('/home/test/.config/systemd') }          # from podman::rootless
+      it { is_expected.to contain_file('/home/test/.config') }                  # from podman::rootless
+      it { is_expected.to contain_file('/etc/containers/systemd/users/4444') }  # from podman::rootless
     end
 
     context 'with enable_api_socket set to valid true' do
@@ -235,19 +290,18 @@ describe 'podman' do
             'user'        => 'dummy',
             'environment' => ['HOME=/home/dummy', 'XDG_RUNTIME_DIR=/run/user/3333', 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/3333/bus'],
             'unless'      => 'systemctl --user status podman.socket',
-            'require'     => ['Exec[loginctl_linger_dummy]', 'Exec[start_dummy.slice]'],
+            'require'     => ['Loginctl_user[dummy]', 'Exec[start_dummy.slice]'],
           },
         )
       end
 
       # only here to reach 100% resource coverage
-      it { is_expected.to contain_exec('loginctl_linger_dummy') }            # from podman::rootless
+      it { is_expected.to contain_podman__rootless('dummy') }                # from podman::rootless
+      it { is_expected.to contain_loginctl_user('dummy') }                   # from podman::rootless
       it { is_expected.to contain_exec('start_dummy.slice') }                # from podman::rootless
       it { is_expected.to contain_file('/home/dummy/.config/systemd/user') } # from podman::rootless
       it { is_expected.to contain_file('/home/dummy/.config/systemd') }      # from podman::rootless
       it { is_expected.to contain_file('/home/dummy/.config') }              # from podman::rootless
-      it { is_expected.to contain_service('podman systemd-logind') }         # from podman::rootless
-      it { is_expected.to contain_podman__rootless('dummy') }                # from podman::rootless
     end
 
     context 'with manage_subuid set to valid true' do

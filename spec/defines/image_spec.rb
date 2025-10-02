@@ -29,16 +29,8 @@ describe 'podman::image' do
       it { is_expected.to contain_class('podman::service') }              # from podman
       it { is_expected.to contain_service('podman.socket') }              # from podman::service
       it { is_expected.to contain_file('/etc/containers/nodocker') }      # from podman::install
-      it { is_expected.to contain_package('buildah') }                    # from podman::install
-      it { is_expected.to contain_package('podman-compose') }             # from podman::install
-      it { is_expected.to contain_package('podman-docker') }              # from podman::install
       it { is_expected.to contain_package('podman') }                     # from podman::install
       it { is_expected.to contain_package('skopeo') }                     # from podman::install
-      if os_facts[:os]['family'] == 'Archlinux'
-        it { is_expected.to contain_package('systemd') }                  # from podman::install
-      else
-        it { is_expected.to contain_package('systemd-container') }        # from podman::install
-      end
 
       if os_facts[:os]['selinux']['enabled'] == true
         it { is_expected.to contain_selboolean('container_manage_cgroup') } # from podman::install
@@ -63,10 +55,10 @@ describe 'podman::image' do
       let(:params) { { ensure: 'absent', image: 'image:test' } }
 
       it do
-        is_expected.to contain_exec('pull_image_title').only_with(
+        is_expected.to contain_exec('remove_image_title').only_with(
           {
-            'command'     => 'podman image pull  image:test',
-            'unless'      => 'podman rmi image:test',
+            'command'     => 'podman rmi image:test',
+            'onlyif'      => 'podman image exists image:test',
             'path'        => '/sbin:/usr/sbin:/bin:/usr/bin',
             'environment' => [],
           },
@@ -92,22 +84,23 @@ describe 'podman::image' do
       it { is_expected.to contain_podman__rootless('dummy').only_with({}) }
 
       it do
-        is_expected.to contain_exec('pull_image_title').only_with(
+        is_expected.to contain_exec('remove_image_title').only_with(
           {
-            'command'     => 'podman image pull  image:test',
-            'unless'      => 'podman rmi image:test',
+            'command'     => 'podman rmi image:test',
+            'onlyif'      => 'podman image exists image:test',
             'path'        => '/sbin:/usr/sbin:/bin:/usr/bin',
             'environment' => ['HOME=/home/dummy', 'XDG_RUNTIME_DIR=/run/user/3333', 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/3333/bus'],
             'cwd'         => '/home/dummy',
             'provider'    => 'shell',
             'user'        => 'dummy',
-            'require'     => ['Podman::Rootless[dummy]', 'Service[podman systemd-logind]'],
+            'require'     => ['Podman::Rootless[dummy]'],
           },
         )
       end
 
       # only here to reach 100% resource coverage
-      it { is_expected.to contain_exec('loginctl_linger_dummy') }            # from podman::rootless
+      it { is_expected.to contain_podman__rootless('dummy') }
+      it { is_expected.to contain_loginctl_user('dummy') }                   # from podman::rootless
       it { is_expected.to contain_exec('start_dummy.slice') }                # from podman::rootless
       it { is_expected.to contain_file('/home/dummy/.config') }              # from podman::rootless
       it { is_expected.to contain_file('/home/dummy/.config/systemd') }      # from podman::rootless
@@ -141,7 +134,7 @@ describe 'podman::image' do
             'cwd'         => '/home/dummy',
             'provider'    => 'shell',
             'user'        => 'dummy',
-            'require'     => ['Podman::Rootless[dummy]', 'Service[podman systemd-logind]'],
+            'require'     => ['Podman::Rootless[dummy]'],
           },
         )
       end
@@ -163,9 +156,9 @@ describe 'podman::image' do
       let(:params) { { flags: { publish: ['242:242'], volume: 'jenkins:/test/ing' }, ensure: 'absent', image: 'image:test' } }
 
       it do
-        is_expected.to contain_exec('pull_image_title').with(
+        is_expected.to contain_exec('remove_image_title').with(
           {
-            'command' => "podman image pull   --publish '242:242' --volume 'jenkins:/test/ing' image:test",
+            'command' => 'podman rmi image:test',
           },
         )
       end
@@ -198,18 +191,18 @@ describe 'podman::image' do
             'cwd'         => '/home/testing',
             'provider'    => 'shell',
             'user'        => 'testing',
-            'require'     => ['Podman::Rootless[testing]', 'Service[podman systemd-logind]'],
+            'require'     => ['Podman::Rootless[testing]'],
           },
         )
       end
 
       # only here to reach 100% resource coverage
-      it { is_expected.to contain_exec('loginctl_linger_testing') }            # from podman::rootless
+      it { is_expected.to contain_podman__rootless('testing') }
+      it { is_expected.to contain_loginctl_user('testing') }                   # from podman::rootless
       it { is_expected.to contain_exec('start_testing.slice') }                # from podman::rootless
       it { is_expected.to contain_file('/home/testing/.config') }              # from podman::rootless
       it { is_expected.to contain_file('/home/testing/.config/systemd') }      # from podman::rootless
       it { is_expected.to contain_file('/home/testing/.config/systemd/user') } # from podman::rootless
-      it { is_expected.to contain_service('podman systemd-logind') }           # from podman::rootless
     end
 
     context 'with user set to valid testing when ensure is set to valid absent' do
@@ -230,16 +223,16 @@ describe 'podman::image' do
       it { is_expected.to contain_podman__rootless('testing').only_with({}) }
 
       it do
-        is_expected.to contain_exec('pull_image_title').only_with(
+        is_expected.to contain_exec('remove_image_title').only_with(
           {
-            'command'     => 'podman image pull  image:test',
-            'unless'      => 'podman rmi image:test',
+            'command'     => 'podman rmi image:test',
+            'onlyif'      => 'podman image exists image:test',
             'path'        => '/sbin:/usr/sbin:/bin:/usr/bin',
             'environment' => ['HOME=/home/testing', 'XDG_RUNTIME_DIR=/run/user/3333', 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/3333/bus'],
             'cwd'         => '/home/testing',
             'provider'    => 'shell',
             'user'        => 'testing',
-            'require'     => ['Podman::Rootless[testing]', 'Service[podman systemd-logind]'],
+            'require'     => ['Podman::Rootless[testing]'],
           },
         )
       end

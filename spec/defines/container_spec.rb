@@ -50,7 +50,7 @@ describe 'podman::container' do
           |if podman container exists namevar
           |  then
           |  image_name=$(podman container inspect namevar --format '{{.ImageName}}')
-          |  running_digest=$(podman image inspect ${image_name} --format '{{.Digest}}')
+          |  running_digest=$(podman image inspect $(podman image inspect ${image_name} --format='{{.ID}}') --format '{{.Digest}}')
           |  latest_digest=$(skopeo inspect docker://registry:latest |     /opt/puppetlabs/puppet/bin/ruby -rjson -e 'puts (JSON.parse(STDIN.read))["Digest"]')
           |  [[ $? -ne 0 ]] && latest_digest=$(skopeo inspect --no-creds docker://registry:latest |     /opt/puppetlabs/puppet/bin/ruby -rjson -e 'puts (JSON.parse(STDIN.read))["Digest"]')
           |  test -z "${latest_digest}" && exit 0     # Do not update if unable to get latest digest
@@ -62,7 +62,7 @@ describe 'podman::container' do
           |if podman container exists namevar
           |  then
           |  image_name=$(podman container inspect namevar --format '{{.ImageName}}')
-          |  running_digest=$(podman image inspect ${image_name} --format '{{.Digest}}')
+          |  running_digest=$(podman image inspect $(podman image inspect ${image_name} --format='{{.ID}}') --format '{{.Digest}}')
           |  latest_digest=$(skopeo inspect docker://registry:latest |     /usr/bin/ruby -rjson -e 'puts (JSON.parse(STDIN.read))["Digest"]')
           |  [[ $? -ne 0 ]] && latest_digest=$(skopeo inspect --no-creds docker://registry:latest |     /usr/bin/ruby -rjson -e 'puts (JSON.parse(STDIN.read))["Digest"]')
           |  test -z "${latest_digest}" && exit 0     # Do not update if unable to get latest digest
@@ -105,11 +105,11 @@ describe 'podman::container' do
 
       remove_onlyif = if %r{^\/opt\/puppetlabs\/}.match?(os_facts[:ruby]['sitedir'])
                         <<-END.gsub(%r{^\s+\|}, '')
-          |test $(podmain container inspect --format json namevar |/opt/puppetlabs/puppet/bin/ruby -rjson -e 'puts (JSON.parse(STDIN.read))[0]["State"]["Running"]') =#{' '}
+          |test $(podman container inspect --format json namevar |/opt/puppetlabs/puppet/bin/ruby -rjson -e 'puts (JSON.parse(STDIN.read))[0]["State"]["Running"]') = true
         END
                       else
                         <<-END.gsub(%r{^\s+\|}, '')
-          |test $(podmain container inspect --format json namevar |/usr/bin/ruby -rjson -e 'puts (JSON.parse(STDIN.read))[0]["State"]["Running"]') =#{' '}
+          |test $(podman container inspect --format json namevar |/usr/bin/ruby -rjson -e 'puts (JSON.parse(STDIN.read))[0]["State"]["Running"]') = true
         END
                       end
 
@@ -165,16 +165,8 @@ describe 'podman::container' do
         it { is_expected.to contain_class('podman::service') }              # from podman
         it { is_expected.to contain_service('podman.socket') }              # from podman::service
         it { is_expected.to contain_file('/etc/containers/nodocker') }      # from podman::install
-        it { is_expected.to contain_package('buildah') }                    # from podman::install
-        it { is_expected.to contain_package('podman-compose') }             # from podman::install
-        it { is_expected.to contain_package('podman-docker') }              # from podman::install
         it { is_expected.to contain_package('podman') }                     # from podman::install
         it { is_expected.to contain_package('skopeo') }                     # from podman::install
-        if os_facts[:os]['family'] == 'Archlinux'
-          it { is_expected.to contain_package('systemd') }                  # from podman::install
-        else
-          it { is_expected.to contain_package('systemd-container') }        # from podman::install
-        end
 
         if os_facts[:os]['selinux']['enabled'] == true
           it { is_expected.to contain_selboolean('container_manage_cgroup') } # from podman::install
@@ -203,7 +195,7 @@ describe 'podman::container' do
         |if podman container exists namevar
         |  then
         |  image_name=$(podman container inspect namevar --format '{{.ImageName}}')
-        |  running_digest=$(podman image inspect ${image_name} --format '{{.Digest}}')
+        |  running_digest=$(podman image inspect $(podman image inspect ${image_name} --format='{{.ID}}') --format '{{.Digest}}')
         |  latest_digest=$(skopeo inspect docker://testing:latest |     /opt/puppetlabs/puppet/bin/ruby -rjson -e 'puts (JSON.parse(STDIN.read))["Digest"]')
         |  [[ $? -ne 0 ]] && latest_digest=$(skopeo inspect --no-creds docker://testing:latest |     /opt/puppetlabs/puppet/bin/ruby -rjson -e 'puts (JSON.parse(STDIN.read))["Digest"]')
         |  test -z "${latest_digest}" && exit 0     # Do not update if unable to get latest digest
@@ -293,7 +285,7 @@ describe 'podman::container' do
         is_expected.to contain_exec('podman_remove_image_testing-namevar').with(
           {
             'notify'      => 'Exec[podman_create_testing-namevar]',
-            'require'     => ['Podman::Rootless[testing]', 'Service[podman systemd-logind]', 'Exec[podman_remove_container_testing-namevar]'],
+            'require'     => ['Podman::Rootless[testing]', 'Exec[podman_remove_container_testing-namevar]'],
             'environment' => ['HOME=/home/testing', 'XDG_RUNTIME_DIR=/run/user/3333', 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/3333/bus'],
             'cwd'         => '/home/testing',
             'user'        => 'testing',
@@ -329,7 +321,7 @@ describe 'podman::container' do
             'command'     => 'podman generate systemd  namevar > /home/testing/.config/systemd/user/podman-namevar.service',
             'refreshonly' => true,
             'notify'      => 'Exec[service_podman_testing-namevar]',
-            'require'     => ['Podman::Rootless[testing]', 'Service[podman systemd-logind]'],
+            'require'     => ['Podman::Rootless[testing]'],
             'path'        => '/sbin:/usr/sbin:/bin:/usr/bin',
             'environment' => ['HOME=/home/testing', 'XDG_RUNTIME_DIR=/run/user/3333', 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/3333/bus'],
             'cwd'         => '/home/testing',
@@ -343,7 +335,7 @@ describe 'podman::container' do
           {
             'command'     => "systemctl --user  enable podman-namevar.service\nsystemctl --user  start podman-namevar.service\n",
             'unless'      => "systemctl --user  is-active podman-namevar.service &&   systemctl --user  is-enabled podman-namevar.service\n",
-            'require'     => ['Podman::Rootless[testing]', 'Service[podman systemd-logind]'],
+            'require'     => ['Podman::Rootless[testing]'],
             'path'        => '/sbin:/usr/sbin:/bin:/usr/bin',
             'environment' => ['HOME=/home/testing', 'XDG_RUNTIME_DIR=/run/user/3333', 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/3333/bus'],
             'cwd'         => '/home/testing',
@@ -354,8 +346,8 @@ describe 'podman::container' do
 
       # only here to reach 100% resource coverage
       context 'cover additional resource from other classes' do
-        it { is_expected.to contain_exec('loginctl_linger_testing') }            # from podman::rootless
-        it { is_expected.to contain_service('podman systemd-logind') }           # from podman::rootless
+        it { is_expected.to contain_podman__rootless('testing') }
+        it { is_expected.to contain_loginctl_user('testing') }                   # from podman::rootless
         it { is_expected.to contain_file('/home/testing/.config') }              # from podman::rootless
         it { is_expected.to contain_file('/home/testing/.config/systemd') }      # from podman::rootless
         it { is_expected.to contain_file('/home/testing/.config/systemd/user') } # from podman::rootless
@@ -415,7 +407,7 @@ describe 'podman::container' do
       it do
         is_expected.to contain_exec('podman_remove_image_testing-namevar').with(
           {
-            'require'     => ['Podman::Rootless[testing]', 'Service[podman systemd-logind]', 'Exec[podman_remove_container_testing-namevar]'],
+            'require'     => ['Podman::Rootless[testing]', 'Exec[podman_remove_container_testing-namevar]'],
             'environment' => ['HOME=/home/testing', 'XDG_RUNTIME_DIR=/run/user/3333', 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/3333/bus'],
             'cwd'         => '/home/testing',
             'user'        => 'testing',
@@ -426,7 +418,7 @@ describe 'podman::container' do
       it do
         is_expected.to contain_file('/home/testing/.config/systemd/user/podman-namevar.service').with(
           {
-            'require' => ['Podman::Rootless[testing]', 'Service[podman systemd-logind]', 'Exec[service_podman_testing-namevar]'],
+            'require' => ['Podman::Rootless[testing]', 'Exec[service_podman_testing-namevar]'],
           },
         )
       end
@@ -655,7 +647,7 @@ describe 'podman::container' do
             'command'     => "systemctl --user  stop podman-namevar\nsystemctl --user  disable podman-namevar\n",
             'onlyif'      => "test \"$(systemctl --user  is-active podman-namevar 2>&1)\" = \"active\" -o   \"$(systemctl --user  is-enabled podman-namevar 2>&1)\" = \"enabled\"\n",
             'notify'      => 'Exec[podman_remove_container_user-namevar]',
-            'require'     => ['Podman::Rootless[user]', 'Service[podman systemd-logind]'],
+            'require'     => ['Podman::Rootless[user]'],
             'path'        => '/sbin:/usr/sbin:/bin:/usr/bin',
             'environment' => ['HOME=/home/user', 'XDG_RUNTIME_DIR=/run/user/3333', 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/3333/bus'],
             'cwd'         => '/home/user',
@@ -670,7 +662,7 @@ describe 'podman::container' do
             'command'     => 'podman container rm --force namevar',
             'unless'      => 'podman container exists namevar; test $? -eq 1',
             'notify'      => 'Exec[podman_remove_image_user-namevar]',
-            'require'     => ['Podman::Rootless[user]', 'Service[podman systemd-logind]'],
+            'require'     => ['Podman::Rootless[user]'],
             'path'        => '/sbin:/usr/sbin:/bin:/usr/bin',
             'environment' => ['HOME=/home/user', 'XDG_RUNTIME_DIR=/run/user/3333', 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/3333/bus'],
             'cwd'         => '/home/user',
@@ -685,7 +677,7 @@ describe 'podman::container' do
             'provider'    => 'shell',
             'command'     => 'podman rmi mandatory:latest || exit 0',
             'refreshonly' => true,
-            'require'     => ['Podman::Rootless[user]', 'Service[podman systemd-logind]', 'Exec[podman_remove_container_user-namevar]'],
+            'require'     => ['Podman::Rootless[user]', 'Exec[podman_remove_container_user-namevar]'],
             'path'        => '/sbin:/usr/sbin:/bin:/usr/bin',
             'environment' => ['HOME=/home/user', 'XDG_RUNTIME_DIR=/run/user/3333', 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/3333/bus'],
             'cwd'         => '/home/user',
@@ -698,7 +690,7 @@ describe 'podman::container' do
         is_expected.to contain_file('/home/user/.config/systemd/user/podman-namevar.service').only_with(
           {
             'ensure'  => 'absent',
-            'require' => ['Podman::Rootless[user]', 'Service[podman systemd-logind]', 'Exec[service_podman_user-namevar]'],
+            'require' => ['Podman::Rootless[user]', 'Exec[service_podman_user-namevar]'],
             'notify'  => 'Exec[podman_systemd_user_reload]',
           },
         )
@@ -706,7 +698,8 @@ describe 'podman::container' do
 
       # only here to reach 100% resource coverage]
       context 'cover additional resource from other classes' do
-        it { is_expected.to contain_exec('loginctl_linger_user') }            # from podman::rootless
+        it { is_expected.to contain_podman__rootless('user') }
+        it { is_expected.to contain_loginctl_user('user') }                   # from podman::rootless
         it { is_expected.to contain_file('/home/user/.config') }              # from podman::rootless
         it { is_expected.to contain_file('/home/user/.config/systemd') }      # from podman::rootless
         it { is_expected.to contain_file('/home/user/.config/systemd/user') } # from podman::rootless
@@ -795,7 +788,7 @@ describe 'podman::container' do
         |if podman container exists namevar
         |  then
         |  image_name=$(podman container inspect namevar --format '{{.ImageName}}')
-        |  running_digest=$(podman image inspect ${image_name} --format '{{.Digest}}')
+        |  running_digest=$(podman image inspect $(podman image inspect ${image_name} --format='{{.ID}}') --format '{{.Digest}}')
         |  latest_digest=$(skopeo inspect docker://mandatory:latest |     /test/ing -rjson -e 'puts (JSON.parse(STDIN.read))["Digest"]')
         |  [[ $? -ne 0 ]] && latest_digest=$(skopeo inspect --no-creds docker://mandatory:latest |     /test/ing -rjson -e 'puts (JSON.parse(STDIN.read))["Digest"]')
         |  test -z "${latest_digest}" && exit 0     # Do not update if unable to get latest digest
@@ -806,7 +799,7 @@ describe 'podman::container' do
       it { is_expected.to contain_exec('verify_container_image_namevar').with_unless(unless_ruby) }
 
       onlyif_ruby = <<-END.gsub(%r{^\s+\|}, '')
-        |test $(podmain container inspect --format json namevar |/test/ing -rjson -e 'puts (JSON.parse(STDIN.read))[0]["State"]["Running"]') =#{' '}
+        |test $(podman container inspect --format json namevar |/test/ing -rjson -e 'puts (JSON.parse(STDIN.read))[0]["State"]["Running"]') = true
       END
 
       it { is_expected.to contain_exec('podman_remove_container_namevar').with_onlyif(onlyif_ruby) }
@@ -831,7 +824,7 @@ describe 'podman::container' do
       it { is_expected.to contain_exec('verify_container_image_namevar').with_unless(unless_ruby) }
 
       onlyif_ruby = <<-END.gsub(%r{^\s+\|}, '')
-        |test $(podmain container inspect --format json namevar |/test/ing -rjson -e 'puts (JSON.parse(STDIN.read))[0]["State"]["Running"]') =#{' '}
+        |test $(podman container inspect --format json namevar |/test/ing -rjson -e 'puts (JSON.parse(STDIN.read))[0]["State"]["Running"]') = true
       END
 
       it { is_expected.to contain_exec('podman_remove_container_namevar').with_onlyif(onlyif_ruby) }

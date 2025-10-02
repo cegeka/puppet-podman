@@ -1,5 +1,60 @@
 # Changelog
 
+## Release 0.7.14
+- Properly handle idempotently removing image. Contributed by ehelms
+- Allow puppet/systemd 9.x. Contributed by evgeni
+
+## Release 0.7.13
+- Only compare secret value if the resource exists #116. Contributed by ehelms
+
+## Release 0.7.12
+- Use replace when creating and secret exists #115. Contributed by ehelms
+
+## Release 0.7.11
+- Fix `uninitialized constant Puppet::Parameter::Boolean` #112. Contributed by stdietrich
+- Bugfix. Ensure existing secret value is correctly evaluated #109. Contributed by ehelms
+
+## Release 0.7.10
+- Update container.pp Add timeout param for create container exec #103. Contributed by zipkid
+- Fix race condition with podman install #107. Contributed by ehelms
+- don't manage additional packages by default #108. Contributed by evgeni
+- Introduce a custom resource to manage podman secrets #106. Contributed by ehelms
+
+## Release 0.7.9
+- Add quadlet parameter to create with disabled service #105.  Contributed by ehelms
+
+## Release 0.7.8
+- Bugfix. Use heredoc when creating a secret #102. Contributed by ehelms
+- Use the quadlet resource title with Systemd::Daemon_reload to allow ordering resources.  Contributed by ehelms
+
+## Release 0.7.7
+- Update module dependencies to support puppet/systemd version 8.x #100
+
+## Release 0.7.6
+- Bugfix. fixing the onlyi_prc condition #94. Contributed by utkarsh079
+
+## Release 0.7.5
+- Bugfix. Resolve image name to ID before fetching digest to resolve false drift #92. Contributed by optiz0r
+
+## Release 0.7.4
+  - Bugfix. Replace deprecated merge() calls with stdlib::merge() - #68.  Reported by ZaxLofful
+
+## Release 0.7.3
+  - Allow version setting on podman and podman-compose packages #77.  Contributed by broadinstitute
+
+## Release 0.7.2
+  - Bugfix. Typos issue 87 as reported by pheeef
+  - Create podman networks before containers. Issues 78 and 85. Contributed by jonesbrennan
+
+## Release 0.7.1
+  - Include inifiles in module fixtures as required by unit tests
+  - Explicit lookup for defaults when calling the quadlet defined type from the main class
+  - Add management of /etc/containers/containers.conf #89.  Contributed by fasrc
+
+## Release 0.7.0
+  - Added the quadlet defined type
+  - Use puppet-systemd to manage rootless users
+
 ## Release 0.6.7
   - Bugfix. Avoid deprecated has_key function #64. Contributed by traylenator
   - Support for Puppet 8.x & puppetlabs/stdlib 9.x #66
@@ -8,7 +63,7 @@
  - Bugfix. Update install.pp due to false positive on selinux check #60. Contributed by magarvo
  - Support ArchLinux #61. Contributed by traylenator
  - Update supported OS list to drop specific versioned releases.
- 
+
 ## Release 0.6.5
 
  - Bugfix for issue #55, Typo in network manifest. Identified by CyberLine

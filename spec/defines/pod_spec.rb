@@ -27,16 +27,8 @@ describe 'podman::pod' do
       it { is_expected.to contain_class('podman::service') }                # from podman
       it { is_expected.to contain_class('podman') }                         # from pre_condition
       it { is_expected.to contain_file('/etc/containers/nodocker') }        # from podman::install
-      it { is_expected.to contain_package('buildah') }                      # from podman::install
-      it { is_expected.to contain_package('podman-compose') }               # from podman::install
-      it { is_expected.to contain_package('podman-docker') }                # from podman::install
       it { is_expected.to contain_package('podman') }                       # from podman::install
       it { is_expected.to contain_package('skopeo') }                       # from podman::install
-      if os_facts[:os]['family'] == 'Archlinux'
-        it { is_expected.to contain_package('systemd') }                    # from podman::install
-      else
-        it { is_expected.to contain_package('systemd-container') }          # from podman::install
-      end
       if os_facts[:os]['selinux']['enabled'] == true
         it { is_expected.to contain_selboolean('container_manage_cgroup') } # from podman::install
       end
@@ -98,18 +90,18 @@ describe 'podman::pod' do
             'cwd'         => '/home/dummy',
             'provider'    => 'shell',
             'user'        => 'dummy',
-            'require'     => ['Podman::Rootless[dummy]', 'Service[podman systemd-logind]'],
+            'require'     => ['Podman::Rootless[dummy]'],
           },
         )
       end
 
       # only here to reach 100% resource coverage
-      it { is_expected.to contain_exec('loginctl_linger_dummy') }            # from podman::rootless
+      it { is_expected.to contain_podman__rootless('dummy') }
+      it { is_expected.to contain_loginctl_user('dummy') }                   # from podman::rootless
       it { is_expected.to contain_exec('start_dummy.slice') }                # from podman::rootless
       it { is_expected.to contain_file('/home/dummy/.config') }              # from podman::rootless
       it { is_expected.to contain_file('/home/dummy/.config/systemd') }      # from podman::rootless
       it { is_expected.to contain_file('/home/dummy/.config/systemd/user') } # from podman::rootless
-      it { is_expected.to contain_service('podman systemd-logind') }         # from podman::rootless
     end
 
     context 'with flags set to valid hash' do
@@ -150,14 +142,15 @@ describe 'podman::pod' do
             'cwd'         => '/home/testing',
             'provider'    => 'shell',
             'user'        => 'testing',
-            'require'     => ['Podman::Rootless[testing]', 'Service[podman systemd-logind]'],
+            'require'     => ['Podman::Rootless[testing]'],
 
           },
         )
       end
 
       # only here to reach 100% resource coverage
-      it { is_expected.to contain_exec('loginctl_linger_testing') }            # from podman::rootless
+      it { is_expected.to contain_podman__rootless('testing') }
+      it { is_expected.to contain_loginctl_user('testing') }                   # from podman::rootless
       it { is_expected.to contain_exec('start_testing.slice') }                # from podman::rootless
       it { is_expected.to contain_file('/home/testing/.config') }              # from podman::rootless
       it { is_expected.to contain_file('/home/testing/.config/systemd') }      # from podman::rootless

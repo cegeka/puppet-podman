@@ -3,6 +3,7 @@
 define podman::rootless {
   ensure_resource('Loginctl_user', $name, { linger => enabled })
 
+  # These aren't needed for quadlets but are the older defined types
   # Ensure the systemd directory tree exists for user services
   ensure_resource('File', [
       "${Users::Localuser[$name]['home']}/.config",
@@ -47,6 +48,11 @@ define podman::rootless {
         "HOME=${Users::Localuser[$name]['home']}",
         "XDG_RUNTIME_DIR=/run/user/${Users::Localuser[$name]['uid']}",
         "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${Users::Localuser[$name]['uid']}/bus",
+      ],
+      unless      => 'systemctl --user status podman.socket',
+      require     => [
+        Loginctl_user[$name],
+        Exec["start_${name}.slice"],
       ],
       unless      => 'systemctl --user status podman.socket',
       require     => [

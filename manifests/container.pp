@@ -50,6 +50,12 @@
 #   '/opt/puppetlabs/puppet/bin/ruby' for Puppetlabs packaged puppet, and
 #   '/usr/bin/ruby' for all others. 
 #
+# @param create_timeout
+#   The timeout value for the container create command.
+#   This is used to override the default timeout of 300 seconds. 
+#   This is needed when deploying containers that take longer to create.
+#   The value can be set to 0 to disable the timeout.
+# 
 # @example
 #   podman::container { 'jenkins':
 #     image         => 'docker.io/jenkins/jenkins',
@@ -65,15 +71,16 @@
 #   }
 #
 define podman::container (
-  Optional[String]           $image         = undef,
-  Optional[String]           $user          = undef,
-  Hash                       $flags         = {},
-  Hash                       $service_flags = {},
-  Optional[String]           $command       = undef,
-  Enum['present', 'absent']  $ensure        = 'present',
-  Boolean                    $enable        = true,
-  Boolean                    $update        = true,
-  Optional[Stdlib::Unixpath] $ruby          = undef,
+  Optional[String]                $image          = undef,
+  Optional[String]                $user           = undef,
+  Hash                            $flags          = {},
+  Hash                            $service_flags  = {},
+  Optional[String]                $command        = undef,
+  Enum['present', 'absent']       $ensure         = 'present',
+  Boolean                         $enable         = true,
+  Boolean                         $update         = true,
+  Optional[Stdlib::Unixpath]      $ruby           = undef,
+  Variant[Undef, Integer, String] $create_timeout = undef,
 ) {
   require podman::install
 
@@ -98,13 +105,13 @@ define podman::container (
   }
 
   # If a container name is not set, use the Puppet resource name
-  $merged_flags = merge({ name => $title, label => $label }, $no_label )
+  $merged_flags = stdlib::merge({ name => $title, label => $label }, $no_label )
   $container_name = $merged_flags['name']
 
   # A rootless container will run as the defined user
   if $user != undef and $user != '' {
     $systemctl = 'systemctl --user '
-    $requires = [Podman::Rootless[$user], Service['podman systemd-logind']]
+    $requires = [Podman::Rootless[$user]]
     $service_unit_file = "${User[$user]['home']}/.config/systemd/user/podman-${container_name}.service"
     $_podman_systemd_reload = Exec["podman_systemd_${user}_reload"]
 
@@ -185,7 +192,7 @@ define podman::container (
           if podman container exists ${container_name}
             then
             image_name=\$(podman container inspect ${container_name} --format '{{.ImageName}}')
-            running_digest=\$(podman image inspect \${image_name} --format '{{.Digest}}')
+            running_digest=\$(podman image inspect $(podman image inspect \${image_name} --format='{{.ID}}') --format '{{.Digest}}')
             latest_digest=\$(skopeo inspect docker://${image} | \
               ${_ruby} -rjson -e 'puts (JSON.parse(STDIN.read))["Digest"]')
             [[ $? -ne 0 ]] && latest_digest=\$(skopeo inspect --no-creds docker://${image} | \
@@ -248,8 +255,8 @@ define podman::container (
         | END
 
       $onlyif_prc = @("END"/L)
-        test $(podmain container inspect --format json ${container_name} |\
-        ${_ruby} -rjson -e 'puts (JSON.parse(STDIN.read))[0]["State"]["Running"]') = 
+        test $(podman container inspect --format json ${container_name} |\
+        ${_ruby} -rjson -e 'puts (JSON.parse(STDIN.read))[0]["State"]["Running"]') = true
         | END
 
       # Try to stop the container service, then the container directly
@@ -302,6 +309,7 @@ define podman::container (
         notify  => Exec["podman_generate_service_${handle}"],
         require => $requires,
         path    => '/sbin:/usr/sbin:/bin:/usr/bin',
+        timeout => $create_timeout,
         *       => $exec_defaults,
       }
 
